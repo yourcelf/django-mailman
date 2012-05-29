@@ -8,6 +8,11 @@ from django.utils.translation import ugettext_lazy as _
 
 from webcall import MultipartPostHandler
 
+# Mailman-Messages for a successful list creation
+CREATELIST_MSG = (
+    u'successfully created', # en
+)
+
 # Mailman-Messages for a successfull subscription
 SUBSCRIBE_MSG = (
     u'Erfolgreich eingetragen', # de
@@ -74,6 +79,13 @@ LANGUAGES = (
     ('utf-8',       _('Chinese (China)')),
     ('utf-8',       _('Chinese (Taiwan)')),
 )
+
+CREATE_DATA = {
+	'autogen': 0,
+	'moderate': 0,
+	'notify': 1,
+	'doit' : 'Create List',
+}
 
 # POST-Data for a list subcription
 SUBSCRIBE_DATA = {
@@ -280,3 +292,31 @@ class List(models.Model):
         request = opener.open(url, UNSUBSCRIBE_DATA)
         content = request.read()
         # no error code to process
+
+    @classmethod
+    def create_list(cls, main_url, email_domain, admin_pass, owner_email,
+                     owner_password, language='en', listname=u'', list_encoding='iso-8859-1'):
+
+        url = '%s/create' % (main_url)
+
+        owner_password = check_encoding(owner_password, list_encoding)
+        owner_email = check_encoding(owner_email, list_encoding)
+        listname = check_encoding(listname, list_encoding)
+
+        CREATE_DATA['listname'] = listname
+        CREATE_DATA['owner'] = owner_email
+	CREATE_DATA['auth'] = admin_pass
+        CREATE_DATA['password'] = owner_password
+        CREATE_DATA['confirm'] = owner_password
+        CREATE_DATA['langs'] = language
+
+        opener = urllib2.build_opener(MultipartPostHandler(list_encoding, True))
+        request = opener.open(url, CREATE_DATA)
+        content = request.read()
+        for status in CREATELIST_MSG:
+            if len(re.findall(status, content)) > 0:
+                list_email = '%s@%s' % (listname, email_domain)
+                return cls(name=listname, password=owner_password, email=list_email, 
+                           main_url=main_url, encoding=list_encoding)
+        raise Exception(content)
+	
