@@ -58,6 +58,16 @@ list.get_all_members()
 This method will return a list of all members in the following format:
 [[u'first-name last-name', u'membername@maildomain.com']]
 
+===Change list settings===
+
+Settings can be changed with ``change_settings``:
+
+    list.change_settings({
+        'privacy/subscribing': { 'advertised': "0" }
+    })
+
+See django_mailman/models.py for a listing of all default settings, and the mailman admin documentation for the meaning of each setting.
+
 ===Admin Moderation Url===
 
 If you would like to provide some functionality to log into your mailman moderation area you could request the complete url from your list.
