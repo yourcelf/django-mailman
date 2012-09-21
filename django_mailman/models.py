@@ -1,13 +1,21 @@
 # -*- coding: utf-8 -*-
 import re
+import os
 import sys
+import time
+from datetime import datetime
 import urllib2
+from cStringIO import StringIO
 from types import UnicodeType
 from copy import deepcopy
-from email.utils import parseaddr
+from email.utils import parseaddr, parsedate
+import gzip
+import mailbox
+import tempfile
 
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from django.utils.timezone import utc
 
 from webcall import MultipartPostHandler
 
@@ -512,3 +520,72 @@ class List(models.Model):
             # is found.  The usual case is that nothing is returned.  Another
             # strategy would be to parse the page form, and ensure its values
             # match the posted ones.
+
+class ListMessageManager(models.Manager):
+    def create_from_archive(self, mlist, month_dt, is_private=True):
+        filename = month_dt.strftime("%Y-%B").title() + ".txt.gz"
+        if is_private:
+            url = '%s/private/%s/%s' % (mlist.main_url, mlist.name, filename)
+            opener = urllib2.build_opener(MultipartPostHandler(mlist.encoding, True))
+            try:
+                request = opener.open(url, {
+                    'username': '',
+                    'password': mlist.password,
+                })
+            except urllib2.HTTPError:
+                return None
+            content = request
+        else:
+            url = '%s/../pipermail/%s/%s' % (mlist.main_url, mlist.name, filename)
+            try:
+                request = urllib2.urlopen(url)
+            except urllib2.HTTPError:
+                return None
+            content = request
+
+        # Python's mailbox.mbox requires a real, named file path.
+        name = None
+        with tempfile.NamedTemporaryFile(delete=False) as fh:
+            txt = request.read()
+            print txt
+            fh.write(txt)
+            name = fh.name
+        mbox = mailbox.mbox(name)
+
+        msgs = []
+        for msg in mbox:
+            listmessage, created = ListMessage.objects.get_or_create(
+                list=mlist,
+                date=datetime.fromtimestamp(time.mktime(parsedate(msg['Date']))).replace(tzinfo=utc),
+                sender=parseaddr(msg['From'].replace(" at ", "@")[1]),
+                subject=msg['Subject'],
+                message_id=msg.get('Message-ID', ''),
+                in_reply_to=msg.get('In-Reply-To', ''),
+                references=msg.get('References', ''),
+                body=get_email_payload_as_string(msg),
+            )
+            msgs.append(listmessage)
+        os.remove(name)
+        return msgs
+
+def get_email_payload_as_string(msg):
+    if msg.is_multipart():
+        return "\n\n".join(
+            string for string in get_payload_as_string(msg.get_payload())
+        )
+    return msg.get_payload(decode=True)
+
+class ListMessage(models.Model):
+    list = models.ForeignKey(List)
+    sender = models.EmailField()
+    date = models.DateTimeField()
+    subject = models.CharField(max_length=255, blank=True)
+    message_id = models.CharField(max_length=255, blank=True)
+    in_reply_to = models.CharField(max_length=255, blank=True)
+    references = models.CharField(max_length=255, blank=True)
+    body = models.TextField()
+
+    objects = ListMessageManager()
+
+    def __unicode__(self):
+        return self.message_id
