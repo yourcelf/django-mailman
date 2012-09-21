@@ -547,7 +547,6 @@ class ListMessageManager(models.Manager):
         name = None
         with tempfile.NamedTemporaryFile(delete=False) as fh:
             txt = request.read()
-            print txt
             fh.write(txt)
             name = fh.name
         mbox = mailbox.mbox(name)
