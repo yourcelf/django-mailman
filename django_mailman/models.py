@@ -284,7 +284,8 @@ class List(models.Model):
     email = models.EmailField(unique=True,
         help_text="The full email address for this list, e.g. mylist@lists.example.com")
     owner = models.TextField(
-        help_text="One or more email addresses of list owners, separated by \n."
+        help_text="One or more email addresses of list owners, separated by \n.",
+        blank=True
     )
     main_url = models.URLField(verify_exists=False,
         help_text="The URL to the mailman installation, e.g. http://lists.example.com/mailman/"
@@ -296,7 +297,7 @@ class List(models.Model):
         verbose_name_plural = 'List-Installations'
 
     def __unicode__(self):
-        return u'%s' % (self.name)
+        return self.name
 
     def __parse_status_content(self, content):
         if not content:
@@ -543,14 +544,18 @@ class ListMessageManager(models.Manager):
                 return None
             content = request
 
-        # Python's mailbox.mbox requires a real, named file path.
         name = None
         with tempfile.NamedTemporaryFile(delete=False) as fh:
             txt = request.read()
             fh.write(txt)
             name = fh.name
-        mbox = mailbox.mbox(name)
+        msgs = self.create_from_mbox(mlist, name)
+        os.remove(name)
+        return msgs
 
+    def create_from_mbox(self, mlist, path):
+        # Python's mailbox.mbox requires a real, named file path.
+        mbox = mailbox.mbox(path)
         msgs = []
         for msg in mbox:
             listmessage, created = ListMessage.objects.get_or_create(
@@ -564,7 +569,6 @@ class ListMessageManager(models.Manager):
                 body=get_email_payload_as_string(msg),
             )
             msgs.append(listmessage)
-        os.remove(name)
         return msgs
 
 def get_email_payload_as_string(msg):
@@ -584,7 +588,14 @@ class ListMessage(models.Model):
     references = models.CharField(max_length=255, blank=True)
     body = models.TextField()
 
+    parent_denormalized = models.ForeignKey('self', null=True, blank=True)
+    thread_depth_denormalized = models.IntegerField(null=True, blank=True)
+    thread_order_denormalized = models.IntegerField(null=True, blank=True)
+
     objects = ListMessageManager()
 
     def __unicode__(self):
         return self.message_id
+
+    class Meta:
+        ordering = ['thread_order_denormalized']
