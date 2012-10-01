@@ -8,7 +8,7 @@ def set_threads(children, urparent=None, parent=None, level=0, count=0):
     for parts in children:
         message = parts['message']
         subchildren = parts['children']
-        message.urparent_denormalized = urparent
+        message.urparent_denormalized = urparent or message
         message.parent_denormalized = parent
         message.thread_depth_denormalized = level
         message.thread_order_denormalized = count
