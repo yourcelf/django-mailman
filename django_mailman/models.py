@@ -567,9 +567,9 @@ class ListMessageManager(models.Manager):
                 list=mlist,
                 date=datetime.fromtimestamp(time.mktime(parsedate(msg['Date']))).replace(tzinfo=utc),
                 sender=parseaddr(msg['From'].replace(" at ", "@"))[1],
-                subject=msg['Subject'],
-                message_id=msg.get('Message-ID', ''),
-                in_reply_to=msg.get('In-Reply-To', ''),
+                subject=msg['Subject'][:255],
+                message_id=msg.get('Message-ID', '')[:255],
+                in_reply_to=msg.get('In-Reply-To', '')[:255],
                 references=msg.get('References', ''),
                 body=get_email_payload_as_string(msg),
             )
@@ -590,7 +590,7 @@ class ListMessage(models.Model):
     subject = models.CharField(max_length=255, blank=True)
     message_id = models.CharField(max_length=255, blank=True, db_index=True)
     in_reply_to = models.CharField(max_length=255, blank=True)
-    references = models.CharField(max_length=255, blank=True)
+    references = models.TextField(blank=True)
     body = models.TextField()
 
     parent_denormalized = models.ForeignKey('self', null=True, blank=True)
