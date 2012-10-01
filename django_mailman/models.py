@@ -558,10 +558,15 @@ class ListMessageManager(models.Manager):
         mbox = mailbox.mbox(path)
         msgs = []
         for msg in mbox:
+            if not msg['Date']:
+                # Assome if there's no 'Date', this is a parser fail.
+                print "OH NOES -- caught invalid message:"
+                print msg.get_payload()
+                continue
             listmessage, created = ListMessage.objects.get_or_create(
                 list=mlist,
                 date=datetime.fromtimestamp(time.mktime(parsedate(msg['Date']))).replace(tzinfo=utc),
-                sender=parseaddr(msg['From'].replace(" at ", "@")[1]),
+                sender=parseaddr(msg['From'].replace(" at ", "@"))[1],
                 subject=msg['Subject'],
                 message_id=msg.get('Message-ID', ''),
                 in_reply_to=msg.get('In-Reply-To', ''),
@@ -583,12 +588,14 @@ class ListMessage(models.Model):
     sender = models.EmailField()
     date = models.DateTimeField()
     subject = models.CharField(max_length=255, blank=True)
-    message_id = models.CharField(max_length=255, blank=True)
+    message_id = models.CharField(max_length=255, blank=True, db_index=True)
     in_reply_to = models.CharField(max_length=255, blank=True)
     references = models.CharField(max_length=255, blank=True)
     body = models.TextField()
 
     parent_denormalized = models.ForeignKey('self', null=True, blank=True)
+    urparent_denormalized = models.ForeignKey('self', null=True, blank=True, 
+            related_name='descendents')
     thread_depth_denormalized = models.IntegerField(null=True, blank=True)
     thread_order_denormalized = models.IntegerField(null=True, blank=True)
 

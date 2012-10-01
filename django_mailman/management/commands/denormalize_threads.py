@@ -4,16 +4,17 @@ from django.core.management.base import BaseCommand
 from django_mailman.models import ListMessage
 from django.db import transaction
 
-def set_threads(children, parent=None, level=0, count=0):
+def set_threads(children, urparent=None, parent=None, level=0, count=0):
     for parts in children:
         message = parts['message']
         subchildren = parts['children']
+        message.urparent_denormalized = urparent
         message.parent_denormalized = parent
         message.thread_depth_denormalized = level
         message.thread_order_denormalized = count
         message.save()
         count += 1
-        count = set_threads(subchildren, message, level + 1, count)
+        count = set_threads(subchildren, urparent or message, message, level + 1, count)
     return count
 
 class Command(BaseCommand):
