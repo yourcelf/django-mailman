@@ -524,7 +524,7 @@ class List(models.Model):
 
 class ListMessageManager(models.Manager):
     def create_from_archive(self, mlist, month_dt, is_private=True):
-        filename = month_dt.strftime("%Y-%B").title() + ".txt.gz"
+        filename = month_dt.strftime("%Y-%B").title() + ".txt"
         if is_private:
             url = '%s/private/%s/%s' % (mlist.main_url, mlist.name, filename)
             opener = urllib2.build_opener(MultipartPostHandler(mlist.encoding, True))
