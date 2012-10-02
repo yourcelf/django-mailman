@@ -571,7 +571,7 @@ class ListMessageManager(models.Manager):
                 message_id=msg.get('Message-ID', '')[:255],
                 in_reply_to=msg.get('In-Reply-To', '')[:255],
                 references=msg.get('References', ''),
-                body=get_email_payload_as_string(msg),
+                body=get_email_payload_as_string(msg).strip(),
             )
             msgs.append(listmessage)
         return msgs
